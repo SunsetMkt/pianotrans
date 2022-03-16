@@ -35,34 +35,38 @@ jobs:
         name: azuwis
         authToken: '${{ secrets.CACHIX_AUTH_TOKEN }}'
         skipPush: true
+    - name: Prepare for cache restore
+      run: |
+        if [ "$(uname)" = "Darwin" ]
+        then
+          sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+        else
+          sudo systemctl stop nix-daemon
+        fi
+        sudo mv /nix/store /nix/store.bak
+        sudo mv /nix/var/nix/db/db.sqlite /nix/var/nix/db/db.sqlite.bak
+        sudo chown $USER /nix /nix/var/nix/db/
     - uses: actions/cache@v2
       id: cache
       with:
-        key: pianotrans2-${{ matrix.os }}-${{ hashFiles('flake.*', 'nix/**') }}
+        key: pianotrans3-${{ matrix.os }}-${{ hashFiles('flake.*', 'nix/**') }}
         restore-keys: |
-          pianotrans2-${{ matrix.os }}-
+          pianotrans3-${{ matrix.os }}-
         path: |
-          nix_store_dir
-          nix_store_db.sqlite
-    - name: Restore cached nix store
+          /nix/store
+          /nix/var/nix/db/db.sqlite
+    - name: Restore if cache miss
       run: |
-        if [ -e nix_store_db.sqlite ]; then
-          if [ "$(uname)" = "Darwin" ]
-          then
-            sudo launchctl unload /Library/LaunchDaemons/org.nixos.nix-daemon.plist
-          else
-            sudo systemctl stop nix-daemon
-          fi
-          # put cached store paths back in their proper locations
-          sudo rm -rf /nix/store /nix/var/nix/db/db.sqlite
-          sudo mv nix_store_dir /nix/store
-          sudo mv nix_store_db.sqlite /nix/var/nix/db/db.sqlite
-          if [ "$(uname)" = "Darwin" ]
-          then
-            sudo launchctl load -w /Library/LaunchDaemons/org.nixos.nix-daemon.plist
-          else
-            sudo systemctl start nix-daemon
-          fi
+        if [ ! -e /nix/store ]
+        then
+          sudo mv /nix/store.bak /nix/store
+          sudo mv /nix/var/nix/db/db.sqlite.bak /nix/var/nix/db/db.sqlite
+        fi
+        if [ "$(uname)" = "Darwin" ]
+        then
+          sudo launchctl load -w /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+        else
+          sudo systemctl start nix-daemon
         fi
     - uses: lhotari/action-upterm@v1
       if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.debug_enabled }}
@@ -82,7 +86,7 @@ jobs:
         nix-collect-garbage -d
         # push to cachix
         cachix push azuwis /nix/var/nix/profiles/per-user/$USER/pianotrans
-    - name: Prepare nix store for caching
+    - name: Prepare for cache upload
       if: steps.cache.outputs.cache-hit != 'true'
       run: |
         if [ "$(uname)" = "Darwin" ]
@@ -91,6 +95,3 @@ jobs:
         else
           sudo systemctl stop nix-daemon
         fi
-        # move store to a place where the cache action can read it
-        sudo mv /nix/store nix_store_dir
-        sudo mv /nix/var/nix/db/db.sqlite nix_store_db.sqlite
