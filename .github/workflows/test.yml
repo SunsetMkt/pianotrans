@@ -91,12 +91,12 @@ jobs:
         - {os: ubuntu-24.04-arm, pianotrans: pianotrans-rocm}
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - uses: azuwis/actions/nix@main
       with:
         key: nix-${{ matrix.pianotrans }}
         debug: ${{ inputs.debug }}
-    - uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+    - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
       with:
         name: azuwis
         authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
